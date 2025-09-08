@@ -1,6 +1,7 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseForbidden
+from django.shortcuts import render
 from django.db.models import Q, Count, Subquery, OuterRef
 from django.utils import timezone
 import time
@@ -174,11 +175,21 @@ def groups(request):
     })
 
 
+def render_error(request, status_code:int, template_name:str=None, context:dict=None):
+    """Central helper to render error templates consistently.
+    Falls back to a simple status text if template missing.
+    """
+    template_name = template_name or f"errors/{status_code}.html"
+    ctx = {"status_code": status_code}
+    if context:
+        ctx.update(context)
+    return render(request, template_name, ctx, status=status_code)
+
 @login_required
 def create_group(request):
     """Teachers can create section groups for their assigned classes; Admin can create any group."""
     if request.user.role not in ["teacher", "admin"]:
-        return HttpResponseForbidden("Not allowed")
+        return render_error(request, 403)
 
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
@@ -188,7 +199,7 @@ def create_group(request):
             class_room = get_object_or_404(ClassRoom, id=class_room_id)
             # Validate teacher has that class
             if request.user.role == "teacher" and request.user.teacher.assigned_class.filter(id=class_room.id).count() == 0:
-                return HttpResponseForbidden("Cannot create group for class you are not assigned")
+                return render_error(request, 403, context={"message": "Not assigned to this class."})
         if name:
             group = GroupChat.objects.create(name=name, class_room=class_room, created_by=request.user)
             GroupMembership.objects.create(group=group, user=request.user)
@@ -213,7 +224,7 @@ def create_group(request):
 def group_chat(request, group_id):
     group = get_object_or_404(GroupChat, id=group_id)
     if not GroupMembership.objects.filter(group=group, user=request.user).exists():
-        return HttpResponseForbidden("Not a member")
+        return render_error(request, 403, context={"message": "You are not a member of this group."})
 
     if request.method == "POST":
         content = request.POST.get("content", "").strip()
