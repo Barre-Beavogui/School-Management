@@ -9,6 +9,15 @@ class AdminRegistrationForm(UserCreationForm):
     class Meta:
         model = User
         fields = ['username', 'email', 'password1', 'password2']
+    def clean_email(self):
+        email = (self.cleaned_data.get('email') or '').strip()
+        # enforce that local-part contains the literal substring '.admin'
+        if '@' not in email:
+            raise forms.ValidationError('Enter a valid email address.')
+        local_part = email.split('@', 1)[0].lower()
+        if '.admin' not in local_part:
+            raise forms.ValidationError('Not an authorized admin email.')
+        return email
     def save(self, commit=True):
         user = super().save(commit=False)
         user.role = 'admin'
@@ -20,6 +29,14 @@ class TeacherRegistrationForm(UserCreationForm):
     class Meta:
         model = User
         fields = ['username', 'email', 'password1', 'password2']
+    def clean_email(self):
+        email = (self.cleaned_data.get('email') or '').strip()
+        if '@' not in email:
+            raise forms.ValidationError('Enter a valid email address.')
+        local_part = email.split('@', 1)[0].lower()
+        if '.teacher' not in local_part:
+            raise forms.ValidationError('Not an authorized teacher email.')
+        return email
     def save(self, commit=True):
         user = super().save(commit=False)
         user.role = 'teacher'
