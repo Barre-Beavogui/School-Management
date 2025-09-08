@@ -1,5 +1,9 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Classes{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/classes-admin-list.css' %}">
+{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2>Classes</h2>
@@ -44,10 +48,7 @@
   <a class="role-btn" href="{% dashboard_url %}"><span>← Back</span></a>
     </div>
 
-<style>
-  #classesTable tbody tr.class-row { cursor:pointer; }
-  #classesTable tbody tr.class-row:focus { outline:2px solid var(--accent,#1875FF); outline-offset:-2px; }
-</style>
+ 
 <script>
   (function(){
     const rows = document.querySelectorAll('#classesTable tbody tr.class-row');

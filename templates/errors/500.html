@@ -1,8 +1,12 @@
 <!-- templates/errors/500.html -->
 {% extends "base.html" %}
+{% load static %}
 {% block title %}500 Server Error{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/errors-shared.css' %}">
+{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-center align-items-center" style="min-height:60vh;">
+<div class="d-flex justify-content-center align-items-center error-center">
   <div class="col-12 col-md-8 col-lg-6">
     <div class="card shadow-sm border-0 text-center">
       <div class="card-body p-4 p-md-5">

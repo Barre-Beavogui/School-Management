@@ -1,18 +1,8 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Create Group{% endblock %}
 {% block extra_css %}
-<style>
-  .cg-shell { max-width:640px; margin:0 auto; }
-  .cg-card { border:1px solid #e5e7eb; border-radius:22px; overflow:hidden; background:#fff; }
-  .cg-header { background:linear-gradient(45deg,var(--accent),#4facfe); color:#fff; padding:18px 26px; display:flex; align-items:center; justify-content:space-between; }
-  .cg-header h1 { font-size:1.05rem; margin:0; font-weight:600; display:flex; gap:10px; align-items:center; }
-  .cg-body { padding:26px 28px 30px; }
-  .form-floating label { font-size:.8rem; }
-  .cg-actions { display:flex; gap:12px; margin-top:6px; }
-  .form-section-title { font-size:.7rem; letter-spacing:.5px; font-weight:600; text-transform:uppercase; color:#64748b; margin-bottom:10px; }
-  .divider { height:1px; background:linear-gradient(90deg,transparent,#e2e8f0,transparent); margin:26px 0 20px; }
-  .help-text { font-size:.65rem; color:#64748b; margin-top:4px; }
-</style>
+<link rel="stylesheet" href="{% static 'css/messaging-create-group.css' %}">
 {% endblock %}
 {% block content %}
 <div class="cg-shell mt-3">
@@ -47,7 +37,7 @@
         </div>
         <div class="mt-4 d-flex gap-3">
           <button type="submit" class="role-btn"><span><i class="bi bi-check2-circle"></i> Create</span></button>
-          <a href="{% url 'groups' %}" class="role-btn" style="background:#64748b;"><span><i class="bi bi-x-circle"></i> Cancel</span></a>
+          <a href="{% url 'groups' %}" class="role-btn btn-cancel-alt"><span><i class="bi bi-x-circle"></i> Cancel</span></a>
         </div>
       </form>
     </div>

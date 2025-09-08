@@ -20,7 +20,7 @@
                     {% for student in students %}
                     <tr>
                         <td>{% include 'partials/user_avatar_name.html' with user_obj=student.user size=32 %}</td>
-                        <td style="max-width:180px;">
+                        <td class="max-w-180">
                             <select name="status_{{ student.id }}" class="form-select">
                                 <option value="">-- Select --</option>
                                 <option value="present" {% if attendance_map.student.id == "present" %}selected{% endif %}>Present</option>
