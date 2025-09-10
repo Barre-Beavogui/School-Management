@@ -17,6 +17,10 @@
   <link rel="stylesheet" href="{% static 'css/custom-buttons.css' %}">
   <link rel="stylesheet" href="{% static 'css/base.css' %}">
 
+  <!-- Favicon (SVG + PNG fallback) -->
+  <link rel="icon" href="{% static 'icons/favicon.svg' %}" type="image/svg+xml">
+  <link rel="icon" href="{% static 'icons/favicon.png' %}" type="image/png">
+
   {% block extra_css %}{% endblock %}
 </head>
 <body class="{% if user.is_authenticated %}{{ user.role|lower }}{% endif %}">
