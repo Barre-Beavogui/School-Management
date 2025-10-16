@@ -8,8 +8,6 @@ from parentsApp.models import Parent
 from teachersApp.models import Teacher
 
 class Message(models.Model):
-    """Direct 1:1 message (supports attachments, scheduling & reactions)."""
-
     sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sent_messages")
     receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name="received_messages")
     content = models.TextField(blank=True)
@@ -43,7 +41,6 @@ class Message(models.Model):
 
 
 class GroupChat(models.Model):
-    """A chat group typically linked to a class/section (ClassRoom)."""
     name = models.CharField(max_length=150)
     class_room = models.OneToOneField(ClassRoom, on_delete=models.CASCADE, related_name="group_chat", null=True, blank=True,
                                       help_text="If set, this group auto-manages members (teachers + parents of students).")
@@ -62,10 +59,8 @@ class GroupChat(models.Model):
     def sync_members_from_class(self):
         if not self.class_room:
             return
-        # Add teachers assigned to this class
         teacher_users = User.objects.filter(teacher__assigned_class=self.class_room).distinct()
         parent_users = User.objects.filter(parent__parent_contact__class_room=self.class_room).distinct()
-        # Add parents of students in this class (student.parent.user)
         student_parent_users = User.objects.filter(parent__parent_contact__class_room=self.class_room).distinct()
         all_users = set(list(teacher_users) + list(parent_users) + list(student_parent_users))
         for u in all_users:
@@ -116,7 +111,6 @@ class GroupMessageRead(models.Model):
     class Meta:
         unique_together = ("message", "user")
 
-
 REACTION_CHOICES = [
     ("👍", "Thumbs Up"),
     ("❤️", "Heart"),
@@ -127,7 +121,6 @@ REACTION_CHOICES = [
 
 
 class Reaction(models.Model):
-    """Emoji reaction for direct or group message (generic)."""
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reactions")
     emoji = models.CharField(max_length=5, choices=REACTION_CHOICES)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)

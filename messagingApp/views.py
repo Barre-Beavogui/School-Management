@@ -21,7 +21,6 @@ from .models import (
 from accountsApp.models import User  # adjust import
 from classesApp.models import ClassRoom
 
-# ------------ Helper utilities -------------
 def _user_dashboard_url_name(user):
     role = getattr(user, "role", None)
     return {
@@ -33,7 +32,6 @@ def _user_dashboard_url_name(user):
 
 @login_required
 def inbox(request):
-    # --- Conversations (direct) ---
     conversations_qs = Message.get_conversations(request.user)
     user_ids = list(conversations_qs.values_list('id', flat=True))
 
@@ -54,26 +52,20 @@ def inbox(request):
             .order_by('-latest_timestamp')
         )
 
-    # --- Groups ---
     memberships = GroupMembership.objects.filter(user=request.user).select_related("group")
     groups = [m.group for m in memberships]
-
-    # --- Inline search (optional) ---
     term = request.GET.get("q", "").strip()
     search_results = []
     if term:
-        # Direct messages
         direct_msgs = Message.objects.filter(
             Q(sender=request.user) | Q(receiver=request.user),
             content__icontains=term
         ).order_by('-timestamp')[:50]
         now = timezone.now()
         direct_msgs = [m for m in direct_msgs if m.is_visible]
-        # Group messages
         group_ids = [g.id for g in groups]
         group_msgs = GroupMessage.objects.filter(group_id__in=group_ids, content__icontains=term).order_by('-timestamp')[:50]
         group_msgs = [gm for gm in group_msgs if gm.is_visible]
-        # Normalize for template: list of dicts
         for m in direct_msgs:
             other = m.receiver if m.sender == request.user else m.sender
             search_results.append({
@@ -93,7 +85,6 @@ def inbox(request):
                 'timestamp': gm.timestamp,
                 'file': gm.file,
             })
-        # Sort combined by timestamp desc
         search_results.sort(key=lambda x: x['timestamp'], reverse=True)
 
     dashboard_url_name = _user_dashboard_url_name(request.user)
@@ -108,8 +99,6 @@ def inbox(request):
 @login_required
 def conversation(request, user_id):
     other_user = get_object_or_404(User, id=user_id)
-
-    # ---- Role-based restrictions ----
     if request.user.role == "admin":
         # Admin → Teacher or Parent
         if other_user.role not in ["teacher", "parent"]:
@@ -122,24 +111,20 @@ def conversation(request, user_id):
 
     elif request.user.role == "parent":
         # Parent → Teacher only
-        if other_user.role not in ["teacher", "admin"]:
+        if other_user.role != "teacher":
             return redirect("inbox")
 
     else:
-        # Students & any other roles not allowed
         return redirect("inbox")
 
-    # ---- Fetch conversation messages ----
     chat_messages_qs = (Message.objects
         .filter(Q(sender=request.user, receiver=other_user) | Q(sender=other_user, receiver=request.user))
         .select_related('sender', 'receiver')
         .prefetch_related('reactions')
         .order_by('timestamp'))
 
-    # Mark unread incoming messages as read
     Message.objects.filter(sender=other_user, receiver=request.user, is_read=False).update(is_read=True)
 
-    # ---- Handle sending new message ----
     if request.method == "POST":
         content = request.POST.get("content", "").strip()
         uploaded_file = request.FILES.get('file')
@@ -153,7 +138,6 @@ def conversation(request, user_id):
         return redirect("conversation", user_id=other_user.id)
 
     visible_messages = [m for m in chat_messages_qs if m.is_visible]
-    # Keep only latest N messages to avoid long history clutter
     MAX_INITIAL = 50
     if len(visible_messages) > MAX_INITIAL:
         visible_messages = visible_messages[-MAX_INITIAL:]
@@ -163,7 +147,6 @@ def conversation(request, user_id):
     })
 
 
-# ------------- Group Messaging ---------------
 @login_required
 def groups(request):
     """List groups the user belongs to."""
@@ -176,9 +159,6 @@ def groups(request):
 
 
 def render_error(request, status_code:int, template_name:str=None, context:dict=None):
-    """Central helper to render error templates consistently.
-    Falls back to a simple status text if template missing.
-    """
     template_name = template_name or f"errors/{status_code}.html"
     ctx = {"status_code": status_code}
     if context:
