@@ -15,7 +15,7 @@
           <div class="gchat-sub">{{ group.memberships.count }} members · {{ group.messages.count }} messages</div>
         </div>
       </div>
-  <div class="g-header-actions">
+      <div class="g-header-actions">
         <a href="{% url 'groups' %}" class="role-btn"><span><i class="bi bi-people"></i> Groups</span></a>
         <a href="{% url 'inbox' %}" class="role-btn"><span><i class="bi bi-chat-dots"></i> Inbox</span></a>
       </div>
@@ -70,7 +70,7 @@
             </div>
           {% endif %}
         {% endfor %}
-  {% else %}
+      {% else %}
         <div class="empty-group"><i class="bi bi-chat-square-dots"></i>No messages yet</div>
       {% endif %}
     </div>
@@ -95,53 +95,329 @@
 {% block extra_js %}
 <script>
   const gChatBody = document.getElementById('gChatBody');
-  function scrollBottom(){ gChatBody.scrollTop = gChatBody.scrollHeight; }
-  scrollBottom();
   const gText = document.getElementById('gText');
   const gForm = document.getElementById('gChatForm');
-  gText.addEventListener('keydown', e => { if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); const txt=gText.value.trim(); if(!txt) return; if(gWs && gWs.readyState===1){ gWs.send(JSON.stringify({action:'send', content:txt})); gText.value=''; } else { gForm.submit(); } } });
-  // Reactions picker & polling
-  function sendReaction(id, emoji){ const fd=new FormData(); fd.append('emoji',emoji); fd.append('type','group'); fd.append('id',id); fetch('{% url 'react_message' %}', {method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}, body:fd}).then(r=>r.json()).then(data=>{ if(data.reactions){ updateReactionStrip(id,data.reactions); } }); }
-  function updateReactionStrip(id, reactions){ const bubble=document.querySelector('.g-bubble[data-id="'+id+'"]'); if(!bubble) return; let strip=bubble.querySelector('.g-react-pills'); if(!strip){ strip=document.createElement('div'); strip.className='g-react-pills'; bubble.appendChild(strip); } strip.innerHTML=''; reactions.forEach(r=>{ const pill=document.createElement('span'); pill.className='g-react-pill'; pill.textContent=r.emoji+' '+r.count; strip.appendChild(pill); }); }
-  const G_EMOJIS=['👍','❤️','😂','😮','😢']; let gPicker=null;
-  function openGPicker(container, mid){ closeGPicker(); const picker=document.createElement('div'); picker.className='g-reaction-picker'; G_EMOJIS.forEach(e=>{ const b=document.createElement('button'); b.textContent=e; b.onclick=()=>{ sendReaction(mid,e); closeGPicker(); }; picker.appendChild(b); }); container.appendChild(picker); gPicker=picker; document.addEventListener('mousedown', gOutside); }
-  function closeGPicker(){ if(gPicker){ gPicker.remove(); gPicker=null; document.removeEventListener('mousedown', gOutside);} }
-  function gOutside(ev){ if(gPicker && !gPicker.contains(ev.target)) closeGPicker(); }
-  document.querySelectorAll('.g-more-btn').forEach(btn=> btn.addEventListener('click', e=>{ e.stopPropagation(); openGPicker(btn.parentElement, btn.dataset.mid); }));
-  document.addEventListener('dblclick', e=>{ const b=e.target.closest('.g-bubble'); if(!b) return; sendReaction(b.dataset.id,'👍'); });
-  // WebSocket realtime group
-  const gScheme = location.protocol==='https:'?'wss':'ws';
-  const gWs = new WebSocket(`${gScheme}://${location.host}/ws/group/{{ group.id }}/`);
-  const gTyping = document.createElement('div'); gTyping.className='small text-muted'; gTyping.style.margin='3px 12px'; gTyping.style.display='none'; gTyping.textContent='Someone typing...'; gChatBody.after(gTyping);
-  let gOldestId = Array.from(document.querySelectorAll('.g-bubble')).map(b=>parseInt(b.dataset.id)).sort((a,b)=>a-b)[0] || null;
-  gWs.onmessage = e => { const data=JSON.parse(e.data); if(data.type==='new'){ gAppend(data.message,true); } else if(data.type==='older'){ gPrepend(data.messages); } else if(data.type==='typing'){ gTyping.style.display='block'; clearTimeout(window._gT); window._gT=setTimeout(()=> gTyping.style.display='none',1400);} else if(data.type==='reaction'){ updateReactionStrip(data.message_id, data.reactions); } };
-  gWs.onerror = ()=> { console.warn('WS error group fallback'); if(!window._gFallback){ window._gFallback=true; startGroupFallback(); } };
-  gWs.onclose = ()=> { if(!window._gFallback){ startGroupFallback(); } };
-  function startGroupFallback(){ let lastId=gOldestId; const loop=()=>{ fetch('{% url 'group_poll' group.id %}?after='+(lastId||0)).then(r=>r.json()).then(d=>{ (d.messages||[]).forEach(m=>{ gAppend(m,true); lastId=Math.max(lastId||0,m.id); }); setTimeout(loop,3000); }).catch(()=> setTimeout(loop,5000)); }; loop(); }
-  function gAppend(m, scroll){ if(document.getElementById('msg-'+m.id)) return; const row=document.createElement('div'); row.className='g-msg-row '+(m.sender_id==={{ user.id }}?'self':''); row.id='msg-'+m.id; row.dataset.id=m.id; row.innerHTML=`<div class=\"g-avatar\">${m.sender_name.charAt(0).toUpperCase()}</div><div class=\"g-bubble\" data-id=\"${m.id}\"><div class=\"g-msg-actions\"><button class=\"g-more-btn\" data-mid=\"${m.id}\">⋯</button></div>${m.sender_id==={{ user.id }}?'':`<strong class=\"g-sender-name\">${m.sender_name}</strong>`}${m.content.replace(/\n/g,'<br>')}<span class=\"g-meta\">${new Date(m.timestamp).toLocaleString()}</span></div>`; gChatBody.appendChild(row); if(scroll) scrollBottom(); gOldestId = Math.min(gOldestId||m.id, m.id); bindGroupMore(row); }
-  function gPrepend(list){ if(!list.length) return; const prevH=gChatBody.scrollHeight; list.forEach(m=>{ if(document.getElementById('msg-'+m.id)) return; const row=document.createElement('div'); row.className='g-msg-row '+(m.sender_id==={{ user.id }}?'self':''); row.id='msg-'+m.id; row.dataset.id=m.id; row.innerHTML=`<div class=\"g-avatar\">${m.sender_name.charAt(0).toUpperCase()}</div><div class=\"g-bubble\" data-id=\"${m.id}\"><div class=\"g-msg-actions\"><button class=\"g-more-btn\" data-mid=\"${m.id}\">⋯</button></div>${m.sender_id==={{ user.id }}?'':`<strong class=\"g-sender-name\">${m.sender_name}</strong>`}${m.content.replace(/\n/g,'<br>')}<span class=\"g-meta\">${new Date(m.timestamp).toLocaleString()}</span></div>`; gChatBody.insertBefore(row, gChatBody.firstChild); gOldestId = Math.min(gOldestId||m.id, m.id); bindGroupMore(row); }); gChatBody.scrollTop = gChatBody.scrollHeight - prevH; }
-  function bindGroupMore(ctx){ ctx.querySelectorAll('.g-more-btn').forEach(btn=>{ if(!btn.dataset.bound){ btn.dataset.bound='1'; btn.addEventListener('click', e=>{ e.stopPropagation(); openGPicker(btn.parentElement, btn.dataset.mid); }); }}); }
-  // Infinite older for group
-  let gLoading=false; gChatBody.addEventListener('scroll', ()=>{ if(gChatBody.scrollTop<15 && !gLoading && gOldestId){ gLoading=true; gWs.send(JSON.stringify({action:'load_older', before:gOldestId})); setTimeout(()=> gLoading=false,700); }});
-  // Typing announce
-  let gTypingCooldown=false; gText.addEventListener('input', ()=>{ if(!gTypingCooldown){ gWs.send(JSON.stringify({action:'typing'})); gTypingCooldown=true; setTimeout(()=> gTypingCooldown=false,1000); }});
-  // Submit: if file present or WS not ready, AJAX upload, else pure WS
-  gForm.addEventListener('submit', e=>{ e.preventDefault(); const t=gText.value.trim(); const hasFile=gFileInput.files.length>0; if(!t && !hasFile) return; if(!hasFile && gWs && gWs.readyState===1){ gWs.send(JSON.stringify({action:'send', content:t})); gText.value=''; return; } const fd=new FormData(); fd.append('content', t); if(gFileInput.files[0]) fd.append('file', gFileInput.files[0]); fetch('{% url 'upload_group' group.id %}', {method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}, body:fd}).then(r=>r.json()).then(resp=>{ if(resp.error){ console.warn(resp.error); return; } gText.value=''; gFileInput.value=''; gPreview.innerHTML=''; gPreview.style.display='none'; }).catch(err=>console.error(err)); });
-  // attachment preview
   const gFileInput = document.getElementById('gFileInput');
   const gPreview = document.getElementById('gAttachPreview');
-  gFileInput.addEventListener('change',()=>{
-    gPreview.innerHTML='';
-    if(!gFileInput.files.length){ gPreview.style.display='none'; return; }
-    [...gFileInput.files].forEach(f=>{
-      const ext = f.name.split('.').pop().toLowerCase();
-      const chip = document.createElement('div'); chip.className='g-attach-chip';
-      if(['png','jpg','jpeg','gif','webp','bmp'].includes(ext)){
-        const img = document.createElement('img'); img.src = URL.createObjectURL(f); chip.appendChild(img);
-      } else { chip.innerHTML = `<i class="bi bi-paperclip"></i> ${f.name.substring(0,18)}`; }
+  const csrfToken = '{{ csrf_token }}';
+  const currentUserId = {{ user.id }};
+  const groupId = {{ group.id }};
+  const selfAvatarHtml = `{% if user.profile_photo %}<img src="{{ user.profile_photo.url }}" class="g-avatar" alt="me">{% else %}<div class="g-avatar">{{ user.get_full_name|default:user.username|slice:':1'|upper }}</div>{% endif %}`;
+  const G_EMOJIS = ['👍','❤️','😂','😮','😢'];
+  let gWs = null;
+  let gReconnectTimer = null;
+  let gTypingCooldown = false;
+  let gTypingTimeout = null;
+  let gPicker = null;
+  let gLoading = false;
+  let gLoadingTimeout = null;
+
+  const existingIds = Array.from(document.querySelectorAll('.g-bubble'))
+    .map(b => Number(b.dataset.id))
+    .filter(n => !Number.isNaN(n))
+    .sort((a, b) => a - b);
+  let gOldestId = existingIds.length ? existingIds[0] : null;
+
+  function scrollBottom() {
+    gChatBody.scrollTop = gChatBody.scrollHeight;
+  }
+  scrollBottom();
+
+  const gTyping = document.createElement('div');
+  gTyping.className = 'small text-muted';
+  gTyping.style.margin = '3px 12px';
+  gTyping.style.display = 'none';
+  gTyping.textContent = 'Someone typing...';
+  gChatBody.after(gTyping);
+
+  function sanitize(text) {
+    const div = document.createElement('div');
+    div.textContent = text || '';
+    return div.innerHTML;
+  }
+
+  function formatContent(content) {
+    return sanitize(content).replace(/\n/g, '<br>');
+  }
+
+  function formatTimestamp(ts) {
+    if (!ts) return '';
+    const date = new Date(ts);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString(undefined, { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+
+  function attachmentMarkup(url) {
+    if (!url) return '';
+    return `<br><a class="g-attach" href="${url}" download><i class="bi bi-download"></i> Download</a>`;
+  }
+
+  function memberAvatar(name, hasPhoto, photoUrl) {
+    if (hasPhoto && photoUrl) {
+      return `<img src="${photoUrl}" class="g-avatar" alt="avatar">`;
+    }
+    const letter = (name || '?').trim().charAt(0).toUpperCase() || '?';
+    return `<div class="g-avatar">${letter}</div>`;
+  }
+
+  function buildRow(message) {
+    if (!message || !message.id) return null;
+    const mid = Number(message.id);
+    if (document.getElementById(`msg-${mid}`)) return null;
+    const isSelf = Number(message.sender_id) === currentUserId;
+    const row = document.createElement('div');
+    row.className = `g-msg-row ${isSelf ? 'self' : ''}`;
+    row.id = `msg-${mid}`;
+    row.dataset.id = mid.toString();
+    const avatarHtml = isSelf ? selfAvatarHtml : memberAvatar(message.sender_name, message.sender_has_photo, message.sender_photo_url);
+    const namePrefix = isSelf ? '' : `<strong class="g-sender-name">${sanitize(message.sender_name)}</strong>`;
+    row.innerHTML = `${avatarHtml}<div class="g-bubble" data-id="${mid}"><div class="g-msg-actions"><button class="g-more-btn" data-mid="${mid}">⋯</button></div>${namePrefix}${formatContent(message.content)}${attachmentMarkup(message.file_url)}<span class="g-meta">${formatTimestamp(message.timestamp)}</span></div>`;
+    return row;
+  }
+
+  function updateReactionStrip(id, reactions) {
+    const bubble = document.querySelector(`.g-bubble[data-id="${id}"]`);
+    if (!bubble) return;
+    let strip = bubble.querySelector('.g-react-pills');
+    if (!strip) {
+      strip = document.createElement('div');
+      strip.className = 'g-react-pills';
+      bubble.appendChild(strip);
+    }
+    strip.innerHTML = '';
+    reactions.forEach(r => {
+      const pill = document.createElement('span');
+      pill.className = 'g-react-pill';
+      pill.textContent = `${r.emoji} ${r.count}`;
+      strip.appendChild(pill);
+    });
+  }
+
+  function sendReaction(id, emoji) {
+    const payload = new FormData();
+    payload.append('emoji', emoji);
+    payload.append('type', 'group');
+    payload.append('id', id);
+    fetch('{% url 'react_message' %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrfToken },
+      body: payload
+    }).then(r => r.json()).then(data => {
+      if (data.reactions) updateReactionStrip(id, data.reactions);
+    });
+  }
+
+  function openPicker(container, mid) {
+    closePicker();
+    const picker = document.createElement('div');
+    picker.className = 'g-reaction-picker';
+    G_EMOJIS.forEach(emoji => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = emoji;
+      btn.addEventListener('click', () => {
+        sendReaction(mid, emoji);
+        closePicker();
+      });
+      picker.appendChild(btn);
+    });
+    container.appendChild(picker);
+    gPicker = picker;
+    document.addEventListener('mousedown', handlePickerOutside);
+  }
+
+  function closePicker() {
+    if (gPicker) {
+      gPicker.remove();
+      gPicker = null;
+      document.removeEventListener('mousedown', handlePickerOutside);
+    }
+  }
+
+  function handlePickerOutside(event) {
+    if (gPicker && !gPicker.contains(event.target)) closePicker();
+  }
+
+  function appendMessage(message, autoscroll) {
+    const row = buildRow(message);
+    if (!row) return;
+    gChatBody.appendChild(row);
+    bindRowActions(row);
+    gOldestId = gOldestId === null ? Number(message.id) : Math.min(gOldestId, Number(message.id));
+    if (autoscroll) scrollBottom();
+  }
+
+  function prependMessages(messages) {
+    if (!messages || !messages.length) {
+      gLoading = false;
+      return;
+    }
+    const prevHeight = gChatBody.scrollHeight;
+    messages.forEach(message => {
+      const row = buildRow(message);
+      if (!row) return;
+      gChatBody.insertBefore(row, gChatBody.firstChild);
+      bindRowActions(row);
+      gOldestId = gOldestId === null ? Number(message.id) : Math.min(gOldestId, Number(message.id));
+    });
+    gChatBody.scrollTop = gChatBody.scrollHeight - prevHeight;
+    gLoading = false;
+    if (gLoadingTimeout) {
+      clearTimeout(gLoadingTimeout);
+      gLoadingTimeout = null;
+    }
+  }
+
+  function bindRowActions(scope) {
+    scope.querySelectorAll('.g-more-btn').forEach(btn => {
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', event => {
+        event.stopPropagation();
+        openPicker(btn.parentElement, btn.dataset.mid);
+      });
+    });
+  }
+  bindRowActions(document);
+
+  document.addEventListener('dblclick', event => {
+    const bubble = event.target.closest('.g-bubble');
+    if (!bubble) return;
+    sendReaction(bubble.dataset.id, '👍');
+  });
+
+  const wsScheme = location.protocol === 'https:' ? 'wss' : 'ws';
+  const gWsUrl = `${wsScheme}://${location.host}/ws/group/${groupId}/`;
+
+  function canUseWebSocket() {
+    return gWs && gWs.readyState === WebSocket.OPEN;
+  }
+
+  function scheduleReconnect() {
+    if (gReconnectTimer) return;
+    gReconnectTimer = setTimeout(() => {
+      gReconnectTimer = null;
+      connectWs();
+    }, 1500);
+  }
+
+  function handleWsMessage(event) {
+    const data = JSON.parse(event.data);
+    if (data.type === 'init' && Array.isArray(data.messages)) {
+      data.messages.forEach(msg => appendMessage(msg, false));
+    } else if (data.type === 'new') {
+      appendMessage(data.message, true);
+    } else if (data.type === 'older') {
+      prependMessages(data.messages);
+    } else if (data.type === 'typing') {
+      gTyping.style.display = 'block';
+      if (gTypingTimeout) clearTimeout(gTypingTimeout);
+      gTypingTimeout = setTimeout(() => { gTyping.style.display = 'none'; }, 1400);
+    } else if (data.type === 'reaction') {
+      updateReactionStrip(data.message_id, data.reactions || []);
+    }
+  }
+
+  function connectWs() {
+    gWs = new WebSocket(gWsUrl);
+    gWs.onmessage = handleWsMessage;
+    gWs.onopen = () => {
+      if (gReconnectTimer) {
+        clearTimeout(gReconnectTimer);
+        gReconnectTimer = null;
+      }
+    };
+    gWs.onclose = scheduleReconnect;
+    gWs.onerror = scheduleReconnect;
+  }
+
+  connectWs();
+
+  function postGroupMessageAjax(text, file = null) {
+    const payload = new FormData();
+    payload.append('content', text);
+    if (file) payload.append('file', file);
+    fetch('{% url 'upload_group' group.id %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrfToken },
+      body: payload
+    }).then(r => r.json()).then(resp => {
+      if (resp && resp.message) appendMessage(resp.message, true);
+      gText.value = '';
+      if (gFileInput) gFileInput.value = '';
+      gPreview.innerHTML = '';
+      gPreview.style.display = 'none';
+    }).catch(console.error);
+  }
+
+  gText.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      const txt = gText.value.trim();
+      if (!txt) return;
+      if (canUseWebSocket()) {
+        gWs.send(JSON.stringify({ action: 'send', content: txt }));
+        gText.value = '';
+      } else {
+        postGroupMessageAjax(txt);
+      }
+    }
+  });
+
+  gText.addEventListener('input', () => {
+    if (!gTypingCooldown && canUseWebSocket()) {
+      gWs.send(JSON.stringify({ action: 'typing' }));
+      gTypingCooldown = true;
+      setTimeout(() => { gTypingCooldown = false; }, 1000);
+    }
+  });
+
+  gChatBody.addEventListener('scroll', () => {
+    if (gChatBody.scrollTop < 15 && !gLoading && gOldestId !== null && canUseWebSocket()) {
+      gLoading = true;
+      gWs.send(JSON.stringify({ action: 'load_older', before: gOldestId }));
+      if (gLoadingTimeout) clearTimeout(gLoadingTimeout);
+      gLoadingTimeout = setTimeout(() => {
+        gLoading = false;
+        gLoadingTimeout = null;
+      }, 4000);
+    }
+  });
+
+  gForm.addEventListener('submit', event => {
+    event.preventDefault();
+    const text = gText.value.trim();
+    const hasFile = gFileInput.files.length > 0;
+    if (!text && !hasFile) return;
+    if (!hasFile && canUseWebSocket()) {
+      gWs.send(JSON.stringify({ action: 'send', content: text }));
+      gText.value = '';
+      return;
+    }
+    const file = gFileInput.files[0] || null;
+    postGroupMessageAjax(text, file);
+  });
+
+  gFileInput.addEventListener('change', () => {
+    gPreview.innerHTML = '';
+    if (!gFileInput.files.length) {
+      gPreview.style.display = 'none';
+      return;
+    }
+    [...gFileInput.files].forEach(file => {
+      const chip = document.createElement('div');
+      chip.className = 'g-attach-chip';
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (['png','jpg','jpeg','gif','webp','bmp'].includes(ext)) {
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        chip.appendChild(img);
+      } else {
+        chip.innerHTML = `<i class="bi bi-paperclip"></i> ${file.name.substring(0,18)}`;
+      }
       gPreview.appendChild(chip);
     });
-    gPreview.style.display='flex';
+    gPreview.style.display = 'flex';
   });
 </script>
 {% endblock %}
