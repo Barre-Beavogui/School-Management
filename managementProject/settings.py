@@ -10,6 +10,7 @@ import os
 import dj_database_url
 from decouple import config
 from django.contrib.messages import constants as messages
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -102,6 +103,10 @@ if DATABASE_URL:
         DATABASE_URL,
         conn_max_age=DB_CONN_MAX_AGE,
         ssl_require=not DEBUG,
+    )
+elif not DEBUG:
+    raise ImproperlyConfigured(
+        "DATABASE_URL must be set when DEBUG is False. Attach your managed database or set the environment variable."
     )
 
 MESSAGE_TAGS = {
