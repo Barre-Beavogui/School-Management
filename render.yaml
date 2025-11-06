@@ -11,6 +11,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.6"
+      - key: ALLOWED_HOSTS
+        value: "{{ env "RENDER_EXTERNAL_HOSTNAME" }}"
       - key: SECRET_KEY
         generateValue: true
       - key: DEBUG
