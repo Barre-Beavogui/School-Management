@@ -27,3 +27,7 @@ whitenoise==6.9.0
 channels==4.1.0
 channels-redis==4.2.0
 daphne==4.1.2
+django-storages[boto3]==1.13.2
+# Use a permissive boto3 spec so pip can pick a compatible release for your Python version
+# (some exact pins may not exist for newer Python interpreters). Allow any 1.x release.
+boto3>=1.26,<2

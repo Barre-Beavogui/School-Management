@@ -153,6 +153,25 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 WEBSOCKETS_ENABLED = config("WEBSOCKETS_ENABLED", default=True, cast=bool)
 SESSION_ENGINE = config("SESSION_ENGINE", default="django.contrib.sessions.backends.db")
 
+# Optional: use S3 (or S3-compatible) object storage for user-uploaded media in production.
+# To enable set USE_S3=True and provide the AWS_* environment variables in your deployment.
+USE_S3 = config("USE_S3", default=False, cast=bool)
+if USE_S3:
+    # Requires: django-storages[boto3], boto3
+    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    AWS_ACCESS_KEY_ID = config("AWS_ACCESS_KEY_ID", default="")
+    AWS_SECRET_ACCESS_KEY = config("AWS_SECRET_ACCESS_KEY", default="")
+    AWS_STORAGE_BUCKET_NAME = config("AWS_STORAGE_BUCKET_NAME", default="")
+    AWS_S3_REGION_NAME = config("AWS_S3_REGION_NAME", default="")
+    AWS_S3_CUSTOM_DOMAIN = config("AWS_S3_CUSTOM_DOMAIN", default="")
+    # Optional: set a custom domain (CDN) for media
+    if AWS_S3_CUSTOM_DOMAIN:
+        MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
+    elif AWS_STORAGE_BUCKET_NAME and AWS_S3_REGION_NAME:
+        MEDIA_URL = f"https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/"
+    elif AWS_STORAGE_BUCKET_NAME:
+        MEDIA_URL = f"https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/"
+
 EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="School Management <no-reply@example.com>")
 EMAIL_HOST = config("EMAIL_HOST", default="")
